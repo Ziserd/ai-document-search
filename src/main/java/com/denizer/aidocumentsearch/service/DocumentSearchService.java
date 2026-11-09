@@ -19,8 +19,11 @@ import java.util.ArrayList;
 @Service
 public class DocumentSearchService {
 
-    private final Map<String, List<String>> documents =
-            new ConcurrentHashMap<>();
+    private final FileStorageService fileStorageService;
+
+    public DocumentSearchService(FileStorageService fileStorageService) {
+        this.fileStorageService = fileStorageService;
+    }
 
     public DocumentUploadResponse uploadDocument(MultipartFile file)
             throws IOException {
@@ -59,7 +62,7 @@ public class DocumentSearchService {
 
         String documentId = UUID.randomUUID().toString();
 
-        documents.put(documentId, lines);
+        fileStorageService.storeFile(documentId, file);
 
         return new DocumentUploadResponse(
                 documentId,
@@ -80,13 +83,17 @@ public class DocumentSearchService {
             );
         }
 
-        List<String> lines = documents.get(documentId);
+        String content;
 
-        if (lines == null) {
+        try {
+            content = fileStorageService.readFile(documentId);
+        } catch (IOException e) {
             throw new IllegalArgumentException(
-                    "Document not found: " + documentId
+                    "Document could not be read: " + documentId, e
             );
         }
+
+        List<String> lines = content.lines().toList();
 
         List<DocumentSearchResult> results = new ArrayList<>();
         int totalOccurrences = 0 ;
