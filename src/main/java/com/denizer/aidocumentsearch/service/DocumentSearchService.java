@@ -1,6 +1,9 @@
 package com.denizer.aidocumentsearch.service;
 
 import com.denizer.aidocumentsearch.dto.DocumentUploadResponse;
+import com.denizer.aidocumentsearch.entity.Document;
+import com.denizer.aidocumentsearch.exception.DocumentNotFoundException;
+import com.denizer.aidocumentsearch.repository.DocumentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,9 +23,11 @@ import java.util.ArrayList;
 public class DocumentSearchService {
 
     private final FileStorageService fileStorageService;
+    private final DocumentRepository documentRepository;
 
-    public DocumentSearchService(FileStorageService fileStorageService) {
+    public DocumentSearchService(FileStorageService fileStorageService, DocumentRepository documentRepository) {
         this.fileStorageService = fileStorageService;
+        this.documentRepository = documentRepository;
     }
 
     public DocumentUploadResponse uploadDocument(MultipartFile file)
@@ -64,6 +69,19 @@ public class DocumentSearchService {
 
         fileStorageService.storeFile(documentId, file);
 
+        Document document = new Document();
+        document.setDocumentId(documentId);
+        document.setFileName(fileName);
+        document.setFileType(
+                lowerCaseName.substring(lowerCaseName.lastIndexOf('.') + 1)
+        );
+        document.setTotalLines(lines.size());
+        document.setStoragePath(
+                fileStorageService.getStoragePath(documentId, fileName)
+        );
+
+        documentRepository.save(document);
+
         return new DocumentUploadResponse(
                 documentId,
                 fileName,
@@ -83,10 +101,18 @@ public class DocumentSearchService {
             );
         }
 
+        Document document = documentRepository
+                .findByDocumentId(documentId)
+                .orElseThrow(() -> new DocumentNotFoundException(
+                        "Document not found: " + documentId
+                ));
+
         String content;
 
         try {
-            content = fileStorageService.readFile(documentId);
+            content = fileStorageService.readFileFromPath(
+                    document.getStoragePath()
+            );
         } catch (IOException e) {
             throw new IllegalArgumentException(
                     "Document could not be read: " + documentId, e
@@ -96,14 +122,14 @@ public class DocumentSearchService {
         List<String> lines = content.lines().toList();
 
         List<DocumentSearchResult> results = new ArrayList<>();
-        int totalOccurrences = 0 ;
+        int totalOccurrences = 0;
+
+        String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
 
         for (int i = 0; i < lines.size(); i++) {
 
             String line = lines.get(i);
-
             String lowerLine = line.toLowerCase(Locale.ROOT);
-            String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
 
             int occurrences = 0;
             int index = 0;

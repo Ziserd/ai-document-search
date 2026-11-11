@@ -1,5 +1,6 @@
 package com.denizer.aidocumentsearch.service;
 
+import com.denizer.aidocumentsearch.exception.DocumentNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,6 +43,15 @@ public class FileStorageService {
         );
     }
 
+    public String getStoragePath(String documentId, String fileName) {
+        String extension = getFileExtension(fileName);
+
+        return storageLocation
+                .resolve(documentId + extension)
+                .normalize()
+                .toString();
+    }
+
     public String readFile(String documentId) throws IOException {
 
         for (String extension : List.of(".txt", ".log")) {
@@ -72,5 +82,20 @@ public class FileStorageService {
 
         return fileName.substring(fileName.lastIndexOf('.'))
                 .toLowerCase(Locale.ROOT);
+    }
+
+    public String readFileFromPath(String storagePath) throws IOException {
+
+        Path filePath = Paths.get(storagePath).toAbsolutePath().normalize();
+
+        if (!filePath.startsWith(storageLocation)) {
+            throw new IllegalArgumentException("Invalid file path");
+        }
+
+        if (!Files.exists(filePath)) {
+            throw new DocumentNotFoundException("Document file not found");
+        }
+
+        return Files.readString(filePath);
     }
 }
