@@ -21,6 +21,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.denizer.aidocumentsearch.exception.DocumentNotFoundException;
 
+import com.denizer.aidocumentsearch.entity.DocumentChunk;
+import com.denizer.aidocumentsearch.repository.DocumentChunkRepository;
+import java.util.stream.IntStream;
+import java.util.List;
+
 @SpringBootTest
 @Transactional
 class AiDocumentSearchApplicationTests {
@@ -30,6 +35,9 @@ class AiDocumentSearchApplicationTests {
 
     @Autowired
     private DocumentSearchService documentSearchService;
+
+    @Autowired
+    private DocumentChunkRepository documentChunkRepository;
 
     @Test
     void contextLoads() {
@@ -201,6 +209,122 @@ class AiDocumentSearchApplicationTests {
         assertThat(searchResponse.totalOccurrences()).isEqualTo(7);
         assertThat(searchResponse.results()).hasSize(3);
     }
+
+
+    @Test
+    void shouldCreateAndSaveChunksWhenDocumentIsUploaded() throws IOException {
+        // Given
+        String content = IntStream.rangeClosed(1, 40)
+                .mapToObj(i -> "Line " + i)
+                .collect(java.util.stream.Collectors.joining("\n"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "chunk-test.txt",
+                "text/plain",
+                content.getBytes()
+        );
+
+        // When
+        DocumentUploadResponse response =
+                documentSearchService.uploadDocument(file);
+
+        // Then
+        List<DocumentChunk> chunks =
+                documentChunkRepository.findByDocumentDocumentId(
+                        response.documentId()
+                );
+
+        assertThat(chunks).hasSize(3);
+
+        assertThat(chunks.get(0).getStartLine()).isEqualTo(1);
+        assertThat(chunks.get(0).getEndLine()).isEqualTo(20);
+
+        assertThat(chunks.get(1).getStartLine()).isEqualTo(18);
+        assertThat(chunks.get(1).getEndLine()).isEqualTo(37);
+
+        assertThat(chunks.get(2).getStartLine()).isEqualTo(35);
+        assertThat(chunks.get(2).getEndLine()).isEqualTo(40);
+
+        assertThat(chunks.get(0).getContent())
+                .contains("Line 1", "Line 20");
+
+        assertThat(chunks.get(1).getContent())
+                .contains("Line 18", "Line 37");
+
+        assertThat(chunks.get(2).getContent())
+                .contains("Line 35", "Line 40");
+    }
+
+
+
+    @Test
+    void shouldCreateSingleChunkForSmallDocument() throws IOException {
+        // Given
+        String content = """
+            Line 1
+            Line 2
+            Line 3
+            Line 4
+            Line 5
+            """;
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "small-document.txt",
+                "text/plain",
+                content.getBytes()
+        );
+
+        // When
+        DocumentUploadResponse response =
+                documentSearchService.uploadDocument(file);
+
+        // Then
+        List<DocumentChunk> chunks =
+                documentChunkRepository.findByDocumentDocumentId(
+                        response.documentId()
+                );
+
+        assertThat(chunks).hasSize(1);
+
+        DocumentChunk chunk = chunks.get(0);
+
+        assertThat(chunk.getStartLine()).isEqualTo(1);
+        assertThat(chunk.getEndLine()).isEqualTo(5);
+        assertThat(chunk.getContent()).contains("Line 1", "Line 5");
+    }
+
+
+    @Test
+    void shouldCreateOneChunkForExactlyTwentyLines() throws IOException {
+        // Given
+        String content = IntStream.rangeClosed(1, 20)
+                .mapToObj(i -> "Line " + i)
+                .collect(java.util.stream.Collectors.joining("\n"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "exactly-twenty-lines.txt",
+                "text/plain",
+                content.getBytes()
+        );
+
+        // When
+        DocumentUploadResponse response =
+                documentSearchService.uploadDocument(file);
+
+        // Then
+        List<DocumentChunk> chunks =
+                documentChunkRepository.findByDocumentDocumentId(
+                        response.documentId()
+                );
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.get(0).getStartLine()).isEqualTo(1);
+        assertThat(chunks.get(0).getEndLine()).isEqualTo(20);
+    }
+
 
 
 }

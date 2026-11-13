@@ -19,17 +19,32 @@ import com.denizer.aidocumentsearch.dto.DocumentSearchResponse;
 import com.denizer.aidocumentsearch.dto.DocumentSearchResult;
 import java.util.ArrayList;
 
+import com.denizer.aidocumentsearch.entity.DocumentChunk;
+import com.denizer.aidocumentsearch.repository.DocumentChunkRepository;
+
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 public class DocumentSearchService {
 
     private final FileStorageService fileStorageService;
     private final DocumentRepository documentRepository;
+    private final DocumentChunkRepository documentChunkRepository;
+    private final DocumentChunkingService documentChunkingService;
 
-    public DocumentSearchService(FileStorageService fileStorageService, DocumentRepository documentRepository) {
+    public DocumentSearchService(
+            FileStorageService fileStorageService,
+            DocumentRepository documentRepository,
+            DocumentChunkRepository documentChunkRepository,
+            DocumentChunkingService documentChunkingService
+    ) {
         this.fileStorageService = fileStorageService;
         this.documentRepository = documentRepository;
+        this.documentChunkRepository = documentChunkRepository;
+        this.documentChunkingService = documentChunkingService;
     }
 
+    @Transactional
     public DocumentUploadResponse uploadDocument(MultipartFile file)
             throws IOException {
 
@@ -80,7 +95,12 @@ public class DocumentSearchService {
                 fileStorageService.getStoragePath(documentId, fileName)
         );
 
-        documentRepository.save(document);
+        Document savedDocument = documentRepository.save(document);
+
+        List<DocumentChunk> chunks =
+                documentChunkingService.createChunks(savedDocument, lines);
+
+        documentChunkRepository.saveAll(chunks);
 
         return new DocumentUploadResponse(
                 documentId,
