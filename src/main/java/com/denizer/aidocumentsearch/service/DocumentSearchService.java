@@ -31,17 +31,20 @@ public class DocumentSearchService {
     private final DocumentRepository documentRepository;
     private final DocumentChunkRepository documentChunkRepository;
     private final DocumentChunkingService documentChunkingService;
+    private final VectorStoreService vectorStoreService;
 
     public DocumentSearchService(
             FileStorageService fileStorageService,
             DocumentRepository documentRepository,
             DocumentChunkRepository documentChunkRepository,
-            DocumentChunkingService documentChunkingService
+            DocumentChunkingService documentChunkingService,
+            VectorStoreService vectorStoreService
     ) {
         this.fileStorageService = fileStorageService;
         this.documentRepository = documentRepository;
         this.documentChunkRepository = documentChunkRepository;
         this.documentChunkingService = documentChunkingService;
+        this.vectorStoreService = vectorStoreService;
     }
 
     @Transactional
@@ -101,6 +104,15 @@ public class DocumentSearchService {
                 documentChunkingService.createChunks(savedDocument, lines);
 
         documentChunkRepository.saveAll(chunks);
+
+        for (DocumentChunk chunk : chunks) {
+            vectorStoreService.saveChunk(
+                    chunk.getContent(),
+                    documentId,
+                    chunk.getStartLine(),
+                    chunk.getEndLine()
+            );
+        }
 
         return new DocumentUploadResponse(
                 documentId,
