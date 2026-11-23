@@ -12,6 +12,8 @@ import java.io.IOException;
 
 import com.denizer.aidocumentsearch.dto.DocumentSearchResponse;
 
+import com.denizer.aidocumentsearch.dto.SemanticSearchResponse;
+
 @RestController
 @RequestMapping("/api/documents")
 public class DocumentController {
@@ -53,4 +55,20 @@ public class DocumentController {
 
         return ResponseEntity.ok(response);
     }
+
+
+    @GetMapping("/{documentId}/semantic-search")
+    public ResponseEntity<SemanticSearchResponse> semanticSearch(
+            @PathVariable String documentId,
+            @RequestParam String query
+    ) {
+        SemanticSearchResponse response =
+                documentSearchService.semanticSearch(
+                        documentId,
+                        query
+                );
+
+        return ResponseEntity.ok(response);
+    }
+
 }

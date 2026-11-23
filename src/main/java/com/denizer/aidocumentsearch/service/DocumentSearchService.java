@@ -24,6 +24,10 @@ import com.denizer.aidocumentsearch.repository.DocumentChunkRepository;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import com.denizer.aidocumentsearch.dto.SemanticSearchResponse;
+import com.denizer.aidocumentsearch.dto.SemanticSearchResult;
+
+
 @Service
 public class DocumentSearchService {
 
@@ -192,4 +196,50 @@ public class DocumentSearchService {
                 results
         );
     }
+
+
+    public SemanticSearchResponse semanticSearch(
+            String documentId,
+            String query
+    ) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Query cannot be empty"
+            );
+        }
+
+        documentRepository.findByDocumentId(documentId)
+                .orElseThrow(() -> new DocumentNotFoundException(
+                        "Document not found: " + documentId
+                ));
+
+        List<org.springframework.ai.document.Document> similarDocuments =
+                vectorStoreService.searchSimilarChunks(
+                        query,
+                        documentId,
+                        5
+                );
+
+        List<SemanticSearchResult> results =
+                similarDocuments.stream()
+                        .map(document -> new SemanticSearchResult(
+                                document.getText(),
+                                ((Number) document.getMetadata()
+                                        .get("startLine")).intValue(),
+                                ((Number) document.getMetadata()
+                                        .get("endLine")).intValue(),
+                                document.getScore() != null
+                                        ? document.getScore()
+                                        : 0.0
+                        ))
+                        .toList();
+
+        return new SemanticSearchResponse(
+                documentId,
+                query,
+                results.size(),
+                results
+        );
+    }
+
 }
